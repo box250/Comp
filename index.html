@@ -3,107 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Device Admin Panel</title>
+    <title>Advanced Admin Panel</title>
     <style>
-        body { font-family: sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-        .box { background: #1e293b; padding: 30px; border-radius: 20px; width: 350px; text-align: center; border: 1px solid #334155; }
-        h2 { color: #38bdf8; margin-bottom: 20px; }
-        button { width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .box { background: #1e293b; padding: 25px; border-radius: 15px; width: 90%; max-width: 400px; text-align: center; border: 1px solid #334155; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        h2 { color: #38bdf8; font-size: 1.5rem; margin-bottom: 20px; }
+        button { width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; transition: 0.3s; text-transform: uppercase; }
         .btn-blue { background: #0284c7; color: white; }
         .btn-green { background: #10b981; color: white; }
-        button:active { transform: scale(0.98); }
-        #results { margin-top: 20px; text-align: left; background: #020617; padding: 15px; border-radius: 12px; display: none; max-height: 300px; overflow-y: auto; font-size: 11px; border: 1px solid #334155; }
-        .entry { border-bottom: 1px solid #1e293b; padding: 10px 0; }
+        #status { font-size: 12px; color: #94a3b8; margin-top: 10px; }
+        #results { margin-top: 20px; text-align: left; background: #020617; padding: 15px; border-radius: 10px; display: none; max-height: 400px; overflow-y: auto; border: 1px solid #334155; font-size: 11px; }
+        .entry { border-bottom: 1px solid #1e293b; padding: 10px 0; line-height: 1.5; }
         .entry b { color: #38bdf8; }
     </style>
 </head>
 <body>
 
 <div class="box">
-    <h2>Админ-Панель</h2>
-    <button class="btn-blue" id="saveBtn" onclick="collectData()">О моем устройстве</button>
-    <button class="btn-green" onclick="viewData()">Данные устройств</button>
+    <h2>System Intelligence</h2>
+    <button class="btn-blue" id="mainBtn" onclick="startDataCollection()">ПОЛНЫЙ СБОР ДАННЫХ</button>
+    <button class="btn-green" onclick="viewCloud()">ПАНЕЛЬ УПРАВЛЕНИЯ</button>
+    <div id="status">Ожидание команды...</div>
     <div id="results"></div>
 </div>
 
 <script>
-    // Твой текущий ID
     const API_URL = "https://api.npoint.io/970512ab12c9b4a48cfd";
 
-    async function collectData() {
-        const btn = document.getElementById('saveBtn');
-        btn.innerText = "Запись...";
-        
-        let geo = { ip: "Скрыт", city: "Неизвестно" };
-        try {
-            const res = await fetch('https://ipapi.co/json/');
-            geo = await res.json();
-        } catch(e) {}
+    async function startDataCollection() {
+        const status = document.getElementById('status');
+        status.innerText = "Сбор системных данных...";
 
-        const info = {
+        let data = {
             time: new Date().toLocaleString("ru-RU"),
-            ip: geo.ip,
-            city: geo.city,
+            coords: "Отказано в доступе",
+            battery: "Неизвестно",
+            device: {}
+        };
+
+        // 1. Пытаемся получить GPS (спросит разрешение)
+        const getGPS = () => new Promise((resolve) => {
+            navigator.geolocation.getCurrentPosition(
+                (p) => resolve(`${p.coords.latitude}, ${p.coords.longitude} (Точность: ${p.coords.accuracy}м)`),
+                () => resolve("Пользователь запретил GPS"),
+                { enableHighAccuracy: true, timeout: 5000 }
+            );
+        });
+        data.coords = await getGPS();
+
+        // 2. Данные о батарее
+        if (navigator.getBattery) {
+            const b = await navigator.getBattery();
+            data.battery = `${Math.round(b.level * 100)}% (${b.charging ? 'Заряжается' : 'Разряжается'})`;
+        }
+
+        // 3. Железо и сеть
+        try {
+            const ipRes = await fetch('https://ipapi.co/json/');
+            const ipJson = await ipRes.json();
+            data.ipInfo = `${ipJson.ip} (${ipJson.city}, ${ipJson.org})`;
+        } catch(e) { data.ipInfo = "Ошибка IP"; }
+
+        data.device = {
             os: navigator.platform,
-            hw: `${navigator.hardwareConcurrency} cores / ${navigator.deviceMemory}GB RAM`,
+            ram: navigator.deviceMemory ? `${navigator.deviceMemory} GB` : "Неизвестно",
+            cores: navigator.hardwareConcurrency || "Неизвестно",
+            screen: `${window.screen.width}x${window.screen.height}`,
             ua: navigator.userAgent
         };
 
+        // 4. Отправка в облако
+        status.innerText = "Синхронизация с облаком...";
         try {
-            // 1. Читаем базу
-            const resp = await fetch(API_URL);
-            let db = await resp.json();
+            const res = await fetch(API_URL);
+            let db = await res.json();
             if (!Array.isArray(db)) db = [];
+            db.push(data);
 
-            // 2. Добавляем данные
-            db.push(info);
-
-            // 3. Сохраняем обратно
-            const save = await fetch(API_URL, {
+            await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(db)
             });
-
-            if (save.ok) alert("Данные сохранены!");
-            else alert("Ошибка сохранения на сервере.");
-        } catch (e) {
-            alert("Сервер npoint выдал ошибку. Попробуй пересоздать Bin на сайте.");
-        } finally {
-            btn.innerText = "О моем устройстве";
+            alert("Данные успешно отправлены!");
+            status.innerText = "Готово.";
+        } catch(e) {
+            alert("Ошибка сохранения. Проверьте npoint.io");
+            status.innerText = "Ошибка.";
         }
     }
 
-    async function viewData() {
-        const pass = prompt("Пароль (3664):");
-        if (pass !== "3664") return alert("Нет доступа");
-
+    async function viewCloud() {
+        if (prompt("Пароль:") !== "3664") return;
         const resDiv = document.getElementById('results');
         resDiv.style.display = 'block';
         resDiv.innerHTML = "Загрузка...";
 
         try {
-            const resp = await fetch(API_URL);
-            const data = await resp.json();
-
-            if (!data || data.length === 0) {
-                resDiv.innerHTML = "База пуста.";
-                return;
-            }
-
-            let html = "";
-            [...data].reverse().forEach((log, i) => {
-                html += `<div class="entry">
-                    <b>#${data.length - i}</b> [${log.time}]<br>
-                    <b>IP:</b> ${log.ip} (${log.city})<br>
-                    <b>Железо:</b> ${log.hw}<br>
-                    <b>ОС:</b> ${log.os}
-                </div>`;
-            });
-            resDiv.innerHTML = html;
-        } catch (e) {
-            resDiv.innerHTML = "Ошибка доступа к базе.";
-        }
+            const res = await fetch(API_URL);
+            const logs = await res.json();
+            resDiv.innerHTML = logs.reverse().map(log => `
+                <div class="entry">
+                    <b>📅 Дата:</b> ${log.time}<br>
+                    <b>📍 Координаты:</b> ${log.coords}<br>
+                    <b>🌐 IP/Сеть:</b> ${log.ipInfo}<br>
+                    <b>🔋 Батарея:</b> ${log.battery}<br>
+                    <b>💻 Железо:</b> ${log.device.os}, ${log.device.ram} RAM, ${log.device.cores} ядер<br>
+                    <b>📏 Экран:</b> ${log.device.screen}
+                </div>
+            `).join('');
+        } catch(e) { resDiv.innerHTML = "Ошибка базы данных."; }
     }
 </script>
 
