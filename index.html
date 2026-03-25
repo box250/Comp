@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Device Admin Panel</title>
+    <style>
+        body { font-family: sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .box { background: #1e293b; padding: 30px; border-radius: 20px; width: 350px; text-align: center; border: 1px solid #334155; }
+        h2 { color: #38bdf8; margin-bottom: 20px; }
+        button { width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn-blue { background: #0284c7; color: white; }
+        .btn-green { background: #10b981; color: white; }
+        button:active { transform: scale(0.98); }
+        #results { margin-top: 20px; text-align: left; background: #020617; padding: 15px; border-radius: 12px; display: none; max-height: 300px; overflow-y: auto; font-size: 11px; border: 1px solid #334155; }
+        .entry { border-bottom: 1px solid #1e293b; padding: 10px 0; }
+        .entry b { color: #38bdf8; }
+    </style>
+</head>
+<body>
+
+<div class="box">
+    <h2>Админ-Панель</h2>
+    <button class="btn-blue" id="saveBtn" onclick="collectData()">О моем устройстве</button>
+    <button class="btn-green" onclick="viewData()">Данные устройств</button>
+    <div id="results"></div>
+</div>
+
+<script>
+    // Твой текущий ID
+    const API_URL = "https://api.npoint.io/970512ab12c9b4a48cfd";
+
+    async function collectData() {
+        const btn = document.getElementById('saveBtn');
+        btn.innerText = "Запись...";
+        
+        let geo = { ip: "Скрыт", city: "Неизвестно" };
+        try {
+            const res = await fetch('https://ipapi.co/json/');
+            geo = await res.json();
+        } catch(e) {}
+
+        const info = {
+            time: new Date().toLocaleString("ru-RU"),
+            ip: geo.ip,
+            city: geo.city,
+            os: navigator.platform,
+            hw: `${navigator.hardwareConcurrency} cores / ${navigator.deviceMemory}GB RAM`,
+            ua: navigator.userAgent
+        };
+
+        try {
+            // 1. Читаем базу
+            const resp = await fetch(API_URL);
+            let db = await resp.json();
+            if (!Array.isArray(db)) db = [];
+
+            // 2. Добавляем данные
+            db.push(info);
+
+            // 3. Сохраняем обратно
+            const save = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(db)
+            });
+
+            if (save.ok) alert("Данные сохранены!");
+            else alert("Ошибка сохранения на сервере.");
+        } catch (e) {
+            alert("Сервер npoint выдал ошибку. Попробуй пересоздать Bin на сайте.");
+        } finally {
+            btn.innerText = "О моем устройстве";
+        }
+    }
+
+    async function viewData() {
+        const pass = prompt("Пароль (3664):");
+        if (pass !== "3664") return alert("Нет доступа");
+
+        const resDiv = document.getElementById('results');
+        resDiv.style.display = 'block';
+        resDiv.innerHTML = "Загрузка...";
+
+        try {
+            const resp = await fetch(API_URL);
+            const data = await resp.json();
+
+            if (!data || data.length === 0) {
+                resDiv.innerHTML = "База пуста.";
+                return;
+            }
+
+            let html = "";
+            [...data].reverse().forEach((log, i) => {
+                html += `<div class="entry">
+                    <b>#${data.length - i}</b> [${log.time}]<br>
+                    <b>IP:</b> ${log.ip} (${log.city})<br>
+                    <b>Железо:</b> ${log.hw}<br>
+                    <b>ОС:</b> ${log.os}
+                </div>`;
+            });
+            resDiv.innerHTML = html;
+        } catch (e) {
+            resDiv.innerHTML = "Ошибка доступа к базе.";
+        }
+    }
+</script>
+
+</body>
+</html>
